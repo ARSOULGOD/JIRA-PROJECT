@@ -1,13 +1,759 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Jira Agent</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jira AI Agent - Command Center</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #3b82f6;
+      --primary-dark: #1e40af;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --border-color: rgba(248, 250, 252, 0.1);
+    }
+
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1a1f35 100%);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Glassmorphism Effect */
+    .glass {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(248, 250, 252, 0.1);
+      border-radius: 12px;
+    }
+
+    .glass-sm {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(248, 250, 252, 0.08);
+      border-radius: 8px;
+    }
+
+    /* Glow Effect */
+    .glow {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .glow:focus-within {
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+    }
+
+    /* Shimmer Effect */
+    @keyframes shimmer {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+
+    .shimmer {
+      background: linear-gradient(90deg, var(--primary), rgba(59, 130, 246, 0.5), var(--primary));
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite;
+    }
+
+    /* Pulse Animation */
+    @keyframes pulse-slow {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .pulse-slow {
+      animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Skeleton Loading */
+    @keyframes skeleton-loading {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, rgba(71, 85, 105, 0.2), rgba(71, 85, 105, 0.4), rgba(71, 85, 105, 0.2));
+      background-size: 1000px 100%;
+      animation: skeleton-loading 2s infinite;
+    }
+
+    /* Smooth Transitions */
+    * {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    input:focus, textarea:focus, button:focus {
+      outline: none;
+    }
+
+    /* Status Badge Colors */
+    .badge-todo {
+      background: rgba(148, 163, 184, 0.2);
+      color: #cbd5e1;
+    }
+
+    .badge-in-progress {
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+    }
+
+    .badge-done {
+      background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+    }
+
+    .badge-blocked {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    /* Priority Icons */
+    .priority-highest { color: #ef4444; }
+    .priority-high { color: #f59e0b; }
+    .priority-medium { color: #eab308; }
+    .priority-low { color: #06b6d4; }
+    .priority-lowest { color: #8b5cf6; }
+
+    /* Sidebar */
+    #sidebar {
+      transition: transform 0.3s ease;
+    }
+
+    @media (max-width: 768px) {
+      #sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        height: 100vh;
+        z-index: 50;
+      }
+
+      #sidebar.open {
+        left: 0;
+      }
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(71, 85, 105, 0.1);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.3);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 0.5);
+    }
+
+    /* Code Syntax Highlighting */
+    .code-chip {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+
+    .jql-keyword { color: #60a5fa; }
+    .jql-string { color: #10b981; }
+    .jql-operator { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <div class="flex h-screen bg-slate-950">
+    <!-- Sidebar -->
+    <div id="sidebar" class="w-72 glass border-r border-slate-700/50 flex flex-col overflow-hidden md:relative md:left-0 md:w-64">
+      <!-- Sidebar Header -->
+      <div class="p-5 border-b border-slate-700/50 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10.5 1.5H5.75A2.75 2.75 0 003 4.25v11.5A2.75 2.75 0 005.75 18.5h8.5a2.75 2.75 0 002.75-2.75V10"/></svg>
+          </div>
+          <span class="font-semibold text-sm">Jira AI</span>
+        </div>
+        <button id="closeSidebar" class="md:hidden p-1 hover:bg-slate-700/50 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Session History -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Session History</h3>
+        <div id="historyList" class="space-y-2">
+          <div class="text-xs text-slate-500 text-center py-4">No history yet</div>
+        </div>
+      </div>
+
+      <!-- Logout Button -->
+      <div class="p-4 border-t border-slate-700/50">
+        <button id="logoutBtn" class="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg text-sm font-medium transition">
+          Logout
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Menu Toggle -->
+    <button id="menuToggle" class="md:hidden fixed top-4 left-4 z-40 p-2 rounded-lg glass">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- Top Bar -->
+      <div class="h-16 glass border-b border-slate-700/50 flex items-center justify-between px-6 md:px-8">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">Command Center</h1>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 px-4 py-2 glass-sm">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-sm font-semibold">
+              <span id="userInitial">A</span>
+            </div>
+            <span id="username" class="text-sm font-medium">User</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 overflow-y-auto p-6 md:p-8">
+        <!-- Login Panel -->
+        <div id="loginPanel" class="hidden h-full flex items-center justify-center">
+          <div class="w-full max-w-md">
+            <div class="glass p-8 space-y-6">
+              <!-- Logo -->
+              <div class="flex justify-center">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                  <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10.5 1.5H5.75A2.75 2.75 0 003 4.25v11.5A2.75 2.75 0 005.75 18.5h8.5a2.75 2.75 0 002.75-2.75V10"/></svg>
+                </div>
+              </div>
+
+              <!-- Title -->
+              <div class="text-center">
+                <h2 class="text-2xl font-bold mb-2">Welcome Back</h2>
+                <p class="text-slate-400 text-sm">Sign in to your Jira AI Agent</p>
+              </div>
+
+              <!-- Form -->
+              <form id="loginForm" class="space-y-4">
+                <!-- Username -->
+                <div>
+                  <label class="text-sm font-medium text-slate-300 block mb-2">Username</label>
+                  <input 
+                    type="text" 
+                    id="loginUsername" 
+                    placeholder="Enter your username" 
+                    class="w-full px-4 py-3 glass-sm text-white placeholder-slate-500 focus:glow focus:ring-0 focus:border-blue-500/50"
+                    required
+                  >
+                </div>
+
+                <!-- Password -->
+                <div>
+                  <label class="text-sm font-medium text-slate-300 block mb-2">Password</label>
+                  <input 
+                    type="password" 
+                    id="loginPassword" 
+                    placeholder="Enter your password" 
+                    class="w-full px-4 py-3 glass-sm text-white placeholder-slate-500 focus:glow focus:ring-0 focus:border-blue-500/50"
+                    required
+                  >
+                </div>
+
+                <!-- Error Message -->
+                <div id="loginError" class="hidden text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3"></div>
+
+                <!-- Submit Button -->
+                <button 
+                  type="submit" 
+                  class="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg font-medium text-white transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <span id="loginButtonText">Sign In</span>
+                </button>
+              </form>
+
+              <!-- Demo Credentials -->
+              <div class="pt-4 border-t border-slate-700/50">
+                <p class="text-xs text-slate-500 text-center mb-2">Demo Credentials:</p>
+                <p class="text-xs text-slate-600 text-center"><span class="text-slate-400">arnav</span> / <span class="text-slate-400">arnav123</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="space-y-6 max-w-6xl mx-auto">
+          <!-- Query Section -->
+          <div class="space-y-4">
+            <!-- Command Bar -->
+            <div class="glass glow p-1">
+              <form id="queryForm" class="flex gap-2">
+                <input 
+                  type="text" 
+                  id="queryInput" 
+                  placeholder="Ask me anything... e.g., 'Show all high priority bugs assigned to me'" 
+                  class="flex-1 px-6 py-4 bg-transparent text-white placeholder-slate-400 focus:ring-0 focus:outline-none text-lg"
+                  autocomplete="off"
+                >
+                <button 
+                  type="submit" 
+                  class="px-6 py-4 hover:bg-blue-500/20 text-blue-400 rounded-lg transition font-medium flex items-center gap-2"
+                  id="querySubmit"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  <span>Query</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <button class="quick-action glass px-4 py-3 text-sm font-medium hover:bg-slate-700/50 rounded-lg transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Active Tasks
+              </button>
+              <button class="quick-action glass px-4 py-3 text-sm font-medium hover:bg-slate-700/50 rounded-lg transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Recently Done
+              </button>
+              <button class="quick-action glass px-4 py-3 text-sm font-medium hover:bg-slate-700/50 rounded-lg transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                By Priority
+              </button>
+              <button class="quick-action glass px-4 py-3 text-sm font-medium hover:bg-slate-700/50 rounded-lg transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Workload
+              </button>
+            </div>
+          </div>
+
+          <!-- JQL Preview Card (Hidden initially) -->
+          <div id="jqlCard" class="hidden glass p-4">
+            <div class="flex items-center gap-3 mb-2">
+              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Generated JQL Query</span>
+            </div>
+            <div class="bg-slate-950 rounded-lg p-3 code-chip overflow-x-auto">
+              <code id="jqlContent" class="text-slate-300"></code>
+            </div>
+          </div>
+
+          <!-- Loading Skeleton (Hidden initially) -->
+          <div id="loadingSkeleton" class="hidden space-y-4">
+            <div class="skeleton h-32 rounded-lg"></div>
+            <div class="skeleton h-24 rounded-lg"></div>
+            <div class="skeleton h-28 rounded-lg"></div>
+          </div>
+
+          <!-- Results Container -->
+          <div id="resultsContainer" class="space-y-4"></div>
+
+          <!-- Empty State -->
+          <div id="emptyState" class="text-center py-16">
+            <div class="w-16 h-16 rounded-2xl bg-slate-700/30 flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-300 mb-2">No results yet</h3>
+            <p class="text-slate-400 text-sm">Ask a question to start exploring your Jira issues</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ──────────────────────────────────────────────────────────────
+    // CONFIG & STATE
+    // ──────────────────────────────────────────────────────────────
+    const API_BASE = 'http://localhost:3000';
+    let authToken = localStorage.getItem('authToken');
+    let currentUser = localStorage.getItem('currentUser');
+    let queryHistory = JSON.parse(localStorage.getItem('queryHistory') || '[]');
+
+    // ──────────────────────────────────────────────────────────────
+    // TOAST NOTIFICATIONS
+    // ──────────────────────────────────────────────────────────────
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      const bgColor = {
+        success: 'bg-green-500/20 border-green-500/30 text-green-300',
+        error: 'bg-red-500/20 border-red-500/30 text-red-300',
+        info: 'bg-blue-500/20 border-blue-500/30 text-blue-300',
+        warning: 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+      }[type];
+
+      toast.className = `fixed bottom-6 right-6 max-w-md px-4 py-3 glass border rounded-lg ${bgColor} text-sm font-medium z-50 animate-in animate-out`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // AUTH
+    // ──────────────────────────────────────────────────────────────
+    function initAuth() {
+      const loginPanel = document.getElementById('loginPanel');
+      const dashboard = document.getElementById('dashboard');
+
+      if (authToken) {
+        loginPanel.classList.add('hidden');
+        dashboard.classList.remove('hidden');
+        document.getElementById('username').textContent = currentUser;
+        document.getElementById('userInitial').textContent = currentUser.charAt(0).toUpperCase();
+        loadHistory();
+      } else {
+        loginPanel.classList.remove('hidden');
+        dashboard.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      const loginError = document.getElementById('loginError');
+      const loginButtonText = document.getElementById('loginButtonText');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+
+      loginError.classList.add('hidden');
+      submitBtn.disabled = true;
+      loginButtonText.textContent = 'Signing in...';
+
+      try {
+        const response = await fetch(`${API_BASE}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        if (!response.ok) {
+          throw new Error('Invalid credentials');
+        }
+
+        const data = await response.json();
+        authToken = data.token;
+        currentUser = data.username;
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('currentUser', currentUser);
+        
+        showToast(`Welcome back, ${currentUser}!`, 'success');
+        initAuth();
+        document.getElementById('loginForm').reset();
+      } catch (err) {
+        loginError.textContent = err.message;
+        loginError.classList.remove('hidden');
+        showToast(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        loginButtonText.textContent = 'Sign In';
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+      authToken = null;
+      currentUser = null;
+      queryHistory = [];
+      document.getElementById('resultsContainer').innerHTML = '';
+      initAuth();
+      showToast('Logged out successfully', 'info');
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // SIDEBAR
+    // ──────────────────────────────────────────────────────────────
+    document.getElementById('menuToggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('open');
+    });
+
+    document.getElementById('closeSidebar').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.remove('open');
+    });
+
+    function loadHistory() {
+      const historyList = document.getElementById('historyList');
+      if (queryHistory.length === 0) {
+        historyList.innerHTML = '<div class="text-xs text-slate-500 text-center py-4">No history yet</div>';
+      } else {
+        historyList.innerHTML = queryHistory.map((item, idx) => `
+          <button class="history-item w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700/30 transition border border-slate-700/30 text-xs" data-index="${idx}">
+            <div class="truncate font-medium text-slate-300">${item.query}</div>
+            <div class="text-slate-500 text-xs mt-1">${item.results} results</div>
+          </button>
+        `).join('');
+
+        document.querySelectorAll('.history-item').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = btn.dataset.index;
+            document.getElementById('queryInput').value = queryHistory[idx].query;
+            document.getElementById('queryForm').dispatchEvent(new Event('submit'));
+            document.getElementById('sidebar').classList.remove('open');
+          });
+        });
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // ACTION/QUERY DETECTION
+    // ──────────────────────────────────────────────────────────────
+    function isActionRequest(question) {
+      const actionKeywords = /\b(create|update|assign|delete|change|modify|set|mark|close|transition|move)\b/i;
+      return actionKeywords.test(question);
+    }
+
+    function createActionResultCard(result) {
+      return `
+        <div class="glass p-6 border border-green-500/30 bg-green-500/5">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <h3 class="text-lg font-semibold text-green-300">Action Completed</h3>
+          </div>
+          <p class="text-slate-300">${result.message}</p>
+        </div>
+      `;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // QUERY & RESULTS
+    // ──────────────────────────────────────────────────────────────
+    document.getElementById('queryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = document.getElementById('queryInput').value.trim();
+      
+      if (!question) return;
+
+      const querySubmit = document.getElementById('querySubmit');
+      const loadingSkeleton = document.getElementById('loadingSkeleton');
+      const resultsContainer = document.getElementById('resultsContainer');
+      const emptyState = document.getElementById('emptyState');
+      const jqlCard = document.getElementById('jqlCard');
+
+      querySubmit.disabled = true;
+      loadingSkeleton.classList.remove('hidden');
+      resultsContainer.innerHTML = '';
+      emptyState.classList.add('hidden');
+      jqlCard.classList.add('hidden');
+
+      try {
+        const isAction = isActionRequest(question);
+        const endpoint = isAction ? '/action' : '/query';
+
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ question })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || (isAction ? 'Action failed' : 'Query failed'));
+        }
+
+        const data = await response.json();
+
+        // Handle action responses
+        if (isAction) {
+          resultsContainer.innerHTML = createActionResultCard(data);
+          showToast(data.message || 'Action completed', 'success');
+          queryHistory.unshift({ query: question, results: 1, timestamp: new Date().toISOString() });
+        } else {
+          // Show JQL
+          if (data.jql) {
+            const jqlContent = document.getElementById('jqlContent');
+            jqlContent.innerHTML = formatJQL(data.jql);
+            jqlCard.classList.remove('hidden');
+          }
+
+          // Show Results
+          if (data.issues && data.issues.length > 0) {
+            resultsContainer.innerHTML = data.issues.map(issue => createIssueCard(issue)).join('');
+            showToast(`Found ${data.issues.length} issues`, 'success');
+          } else {
+            emptyState.classList.remove('hidden');
+            showToast('No issues found', 'info');
+          }
+
+          queryHistory.unshift({ query: question, results: data.total, timestamp: new Date().toISOString() });
+        }
+
+        // Add to history
+        queryHistory = queryHistory.slice(0, 20);
+        localStorage.setItem('queryHistory', JSON.stringify(queryHistory));
+        loadHistory();
+
+      } catch (err) {
+        showToast(err.message, 'error');
+        emptyState.classList.remove('hidden');
+      } finally {
+        loadingSkeleton.classList.add('hidden');
+        querySubmit.disabled = false;
+      }
+    });
+
+    function formatJQL(jql) {
+      return jql
+        .replace(/\b(project|status|assignee|priority|type|created|updated|resolved)\b/gi, '<span class="jql-keyword">$1</span>')
+        .replace(/"([^"]*)"/g, '<span class="jql-string">"$1"</span>')
+        .replace(/(\s+(?:=|!=|~|!~|>|<|>=|<=|in|not in)\s+)/gi, '<span class="jql-operator">$1</span>');
+    }
+
+    function createIssueCard(issue) {
+      const status = issue.fields.status?.name || 'Unknown';
+      const statusBadgeClass = getStatusBadgeClass(status);
+      const priority = issue.fields.priority?.name || 'No Priority';
+      const priorityIcon = getPriorityIcon(priority);
+      const assignee = issue.fields.assignee?.displayName || 'Unassigned';
+      const assigneeAvatar = assignee.charAt(0).toUpperCase();
+
+      return `
+        <div class="glass p-6 hover:bg-slate-800/50 transition group cursor-pointer">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <a href="https://jira.atlassian.com/browse/${issue.key}" target="_blank" class="text-blue-400 hover:text-blue-300 font-semibold transition">
+                  ${issue.key}
+                </a>
+                <span class="badge-${statusBadgeClass} px-3 py-1 rounded-full text-xs font-medium border border-current/20">${status}</span>
+              </div>
+              <h3 class="text-lg font-semibold text-slate-100 group-hover:text-white transition mb-2">${issue.fields.summary}</h3>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 mb-4 pt-3 border-t border-slate-700/30">
+            <div class="flex items-center gap-2">
+              <span class="priority-${getPriorityColor(priority)}">${priorityIcon}</span>
+              <span class="text-sm text-slate-400">${priority}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-xs font-semibold">
+                ${assigneeAvatar}
+              </div>
+              <span class="text-sm text-slate-400">${assignee}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-500">${formatDate(issue.fields.updated)}</span>
+            </div>
+          </div>
+
+          ${issue.fields.description ? `
+            <div class="text-sm text-slate-400 line-clamp-2 pt-3 border-t border-slate-700/30">
+              ${issue.fields.description}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function getStatusBadgeClass(status) {
+      const statusMap = {
+        'To Do': 'todo',
+        'In Progress': 'in-progress',
+        'Done': 'done',
+        'Blocked': 'blocked'
+      };
+      return statusMap[status] || 'todo';
+    }
+
+    function getPriorityIcon(priority) {
+      const icons = {
+        'Highest': '🔴',
+        'High': '🟠',
+        'Medium': '🟡',
+        'Low': '🔵',
+        'Lowest': '🟣'
+      };
+      return icons[priority] || '⚪';
+    }
+
+    function getPriorityColor(priority) {
+      const colors = {
+        'Highest': 'highest',
+        'High': 'high',
+        'Medium': 'medium',
+        'Low': 'low',
+        'Lowest': 'lowest'
+      };
+      return colors[priority] || 'medium';
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+      return `${Math.floor(diffDays / 30)}m ago`;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // QUICK ACTIONS
+    // ──────────────────────────────────────────────────────────────
+    const quickActions = {
+      'Active Tasks': 'Show me all issues assigned to me',
+      'Recently Done': 'What have we completed recently',
+      'By Priority': 'Show all issues sorted by priority',
+      'Workload': 'What is the current team workload'
+    };
+
+    document.querySelectorAll('.quick-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const label = btn.textContent.trim().split('\n')[0];
+        const query = quickActions[label];
+        if (query) {
+          document.getElementById('queryInput').value = query;
+          document.getElementById('queryForm').dispatchEvent(new Event('submit'));
+        }
+      });
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // INITIALIZATION
+    // ──────────────────────────────────────────────────────────────
+    initAuth();
+  </script>
+</body>
 </html>
