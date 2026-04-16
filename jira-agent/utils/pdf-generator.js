@@ -33,15 +33,16 @@ function generateSprintReportPDF(sprintName, issues) {
       doc.moveDown(1.5);
 
       // Summary Box
-      doc.rect(40, doc.y, 515, 80).stroke();
+      doc.rect(40, doc.y, 515, 100).stroke();
       doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000');
       doc.text('Summary', 50, doc.y + 10);
       
       const stats = calculateStats(issues);
       doc.font('Helvetica').fontSize(10).moveDown(0.5);
       doc.text(`Total Issues: ${stats.total}`, 50);
-      doc.text(`Completed: ${stats.completed} | In Progress: ${stats.inProgress} | To Do: ${stats.todo}`, 50);
-      doc.text(`High Priority: ${stats.highPriority} | Highest Priority: ${stats.highestPriority}`, 50);
+      doc.text(`Types: ${stats.stories} Stories | ${stats.tasks} Tasks | ${stats.bugs} Bugs`, 50);
+      doc.text(`Status: ${stats.completed} Completed | ${stats.inProgress} In Progress | ${stats.todo} To Do`, 50);
+      doc.text(`Priority: ${stats.highestPriority} Highest | ${stats.highPriority} High`, 50);
       doc.moveDown(2);
 
       // Issue Type Breakdown
@@ -93,6 +94,9 @@ function calculateStats(issues) {
     todo: 0,
     highPriority: 0,
     highestPriority: 0,
+    stories: 0,
+    tasks: 0,
+    bugs: 0,
     typeBreakdown: {},
     statusBreakdown: {},
     priorityBreakdown: {},
@@ -113,6 +117,11 @@ function calculateStats(issues) {
     // Type breakdown
     const type = fields.issuetype?.name || 'Unknown';
     stats.typeBreakdown[type] = (stats.typeBreakdown[type] || 0) + 1;
+    
+    const typeLower = type.toLowerCase();
+    if (typeLower === 'story') stats.stories++;
+    else if (typeLower === 'bug') stats.bugs++;
+    else if (typeLower === 'task') stats.tasks++;
 
     // Priority breakdown
     const priority = fields.priority?.name || 'Medium';
@@ -272,7 +281,7 @@ async function generateDetailedSprintReportPDF(sprintName, issues, options = {})
       doc.moveDown(1.5);
 
       // Summary Box
-      doc.rect(40, doc.y, 515, 100).stroke();
+      doc.rect(40, doc.y, 515, 115).stroke();
       doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000');
       doc.text('Summary Statistics', 50, doc.y + 10);
       
@@ -281,6 +290,7 @@ async function generateDetailedSprintReportPDF(sprintName, issues, options = {})
       
       doc.font('Helvetica').fontSize(10).moveDown(0.5);
       doc.text(`Total Issues: ${stats.total}`, 50);
+      doc.text(`Types: ${stats.stories} Stories | ${stats.tasks} Tasks | ${stats.bugs} Bugs`, 50);
       doc.text(`Completion Rate: ${completionRate}% (${stats.completed}/${stats.total})`, 50);
       doc.text(`Status: ${stats.completed} Done | ${stats.inProgress} In Progress | ${stats.todo} To Do`, 50);
       doc.text(`High Priority Issues: ${stats.highPriority + stats.highestPriority}`, 50);

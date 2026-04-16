@@ -23,29 +23,57 @@ const jiraAxios = axios.create({
 });
 
 /**
+ * Find the best board for this project (with fallback to all boards)
+ */
+async function getBoardForProject() {
+  // Try 1: project-scoped board lookup
+  try {
+    const res = await jiraAxios.get(`/rest/agile/1.0/board?projectKeyOrId=${JIRA_PROJECT_KEY}&maxResults=10`);
+    const boards = res.data.values || [];
+    console.log(`[JIRA] Project-scoped boards: ${boards.length}`);
+    if (boards.length > 0) {
+      const scrum = boards.find(b => b.type === 'scrum');
+      return scrum || boards[0];
+    }
+  } catch (e) {
+    console.warn('[JIRA] Project-scoped board lookup failed:', e.response?.status, e.response?.data?.message || e.message);
+  }
+
+  // Try 2: list all accessible boards
+  try {
+    const allRes = await jiraAxios.get('/rest/agile/1.0/board?maxResults=50');
+    const allBoards = allRes.data.values || [];
+    console.log(`[JIRA] All accessible boards: ${allBoards.length}`);
+    if (allBoards.length > 0) {
+      // Look for a board that matches project key in its name
+      const projectBoard = allBoards.find(b => b.name.toUpperCase().includes(JIRA_PROJECT_KEY));
+      const scrum = allBoards.find(b => b.type === 'scrum');
+      return projectBoard || scrum || allBoards[0];
+    }
+  } catch (e) {
+    console.warn('[JIRA] Global board lookup failed:', e.response?.status, e.response?.data?.message || e.message);
+  }
+
+  return null; // No board found - callers handle this gracefully
+}
+
+/**
  * Get active sprint for the project
  */
 async function getActiveSprint() {
   try {
-    const res = await jiraAxios.get(`/rest/api/3/board`);
-    const boards = res.data.values || [];
-    
-    // Find Scrum board (typically Scrum projects have this)
-    const board = boards.find(b => b.type === 'scrum');
+    const board = await getBoardForProject();
     if (!board) {
-      throw new Error('No Scrum board found');
+      console.warn('[JIRA] No board found. Sprints unavailable.');
+      return null;
     }
-
-    // Get sprints for the board
-    const sprintRes = await jiraAxios.get(`/rest/api/3/board/${board.id}/sprint`);
+    console.log(`[JIRA] Using board: ${board.name} (id=${board.id}, type=${board.type})`);
+    const sprintRes = await jiraAxios.get(`/rest/agile/1.0/board/${board.id}/sprint?state=active`);
     const sprints = sprintRes.data.values || [];
-    
-    // Find active sprint (state = 'active')
-    const activeSprint = sprints.find(s => s.state === 'active');
-    return activeSprint || null;
+    return sprints[0] || null;
   } catch (err) {
     console.error('[JIRA] Error fetching active sprint:', err.message);
-    throw new Error(`Failed to fetch active sprint: ${err.message}`);
+    return null; // Gracefully return null so callers can proceed without sprint
   }
 }
 
@@ -54,27 +82,19 @@ async function getActiveSprint() {
  */
 async function getSprintByNameOrId(sprintIdentifier) {
   try {
-    const res = await jiraAxios.get(`/rest/api/3/board`);
-    const boards = res.data.values || [];
-    const board = boards.find(b => b.type === 'scrum');
-    
-    if (!board) {
-      throw new Error('No Scrum board found');
-    }
-
-    const sprintRes = await jiraAxios.get(`/rest/api/3/board/${board.id}/sprint`);
+    const board = await getBoardForProject();
+    if (!board) return null;
+    const sprintRes = await jiraAxios.get(`/rest/agile/1.0/board/${board.id}/sprint?maxResults=50`);
     const sprints = sprintRes.data.values || [];
     
-    // Try to match by ID first, then by name
     let sprint = sprints.find(s => s.id === parseInt(sprintIdentifier));
     if (!sprint) {
       sprint = sprints.find(s => s.name.toLowerCase() === sprintIdentifier.toLowerCase());
     }
-    
     return sprint || null;
   } catch (err) {
     console.error('[JIRA] Error fetching sprint:', err.message);
-    throw new Error(`Failed to fetch sprint: ${err.message}`);
+    return null;
   }
 }
 
@@ -105,25 +125,14 @@ async function getSprintIssues(sprintId) {
  */
 async function getAllSprints(includeInactive = false) {
   try {
-    const res = await jiraAxios.get(`/rest/api/3/board`);
-    const boards = res.data.values || [];
-    const board = boards.find(b => b.type === 'scrum');
-    
-    if (!board) {
-      throw new Error('No Scrum board found');
-    }
-
-    const sprintRes = await jiraAxios.get(`/rest/api/3/board/${board.id}/sprint`);
-    let sprints = sprintRes.data.values || [];
-    
-    if (!includeInactive) {
-      sprints = sprints.filter(s => s.state === 'active' || s.state === 'future');
-    }
-    
-    return sprints;
+    const board = await getBoardForProject();
+    if (!board) return [];
+    const stateFilter = includeInactive ? '' : '?state=active&state=future';
+    const sprintRes = await jiraAxios.get(`/rest/agile/1.0/board/${board.id}/sprint${stateFilter}`);
+    return sprintRes.data.values || [];
   } catch (err) {
     console.error('[JIRA] Error fetching all sprints:', err.message);
-    throw new Error(`Failed to fetch sprints: ${err.message}`);
+    return [];
   }
 }
 
@@ -207,7 +216,7 @@ async function createIssueWithFields(fields) {
  */
 async function addIssueToSprint(issueKey, sprintId) {
   try {
-    const res = await jiraAxios.post('/rest/api/3/sprint/' + sprintId + '/issue', {
+    const res = await jiraAxios.post('/rest/agile/1.0/sprint/' + sprintId + '/issue', {
       issues: [issueKey]
     });
     return res.data;

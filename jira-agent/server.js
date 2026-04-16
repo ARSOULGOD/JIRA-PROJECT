@@ -129,24 +129,37 @@ app.get('/report', requireAuth, async (req, res) => {
   }
 
   try {
-    const sprintObj = await jiraHelpers.getSprintByNameOrId(sprint);
-    if (!sprintObj) {
-      return res.status(404).json({ error: `Sprint "${sprint}" not found` });
+    let issues, reportName;
+
+    if (sprint === '__all__') {
+      // No sprint — fetch all project issues
+      reportName = `${JIRA_PROJECT_KEY} - All Issues`;
+      issues = await jiraHelpers.searchIssues(
+        `project = ${JIRA_PROJECT_KEY} ORDER BY updated DESC`,
+        100
+      );
+    } else {
+      const sprintObj = await jiraHelpers.getSprintByNameOrId(sprint);
+      if (!sprintObj) {
+        return res.status(404).json({ error: `Sprint "${sprint}" not found` });
+      }
+      reportName = sprintObj.name;
+      issues = await jiraHelpers.getSprintIssues(sprintObj.id);
+      log(req.user.username, `report:${sprintObj.name}`, `sprint=${sprintObj.id}`, issues.length);
     }
 
-    const issues = await jiraHelpers.getSprintIssues(sprintObj.id);
-    const pdfBuffer = await generateSprintReportPDF(sprintObj.name, issues);
+    const pdfBuffer = await generateSprintReportPDF(reportName, issues);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="sprint-report-${sprintObj.name.replace(/\s+/g, '_')}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="report-${reportName.replace(/\s+/g, '_')}.pdf"`);
     res.send(pdfBuffer);
 
-    log(req.user.username, `report:${sprintObj.name}`, `sprint=${sprintObj.id}`, issues.length);
   } catch (err) {
     console.error('[REPORT ERROR]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ── ENHANCED ISSUE CREATION ────────────────────
 app.post('/create-issue', requireAuth, async (req, res) => {
@@ -310,9 +323,18 @@ app.post('/query', requireAuth, async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `Convert natural language to JQL. 
-                    Project = ${JIRA_PROJECT_KEY}.
-                    Return ONLY JQL.`
+          content: `Convert natural language to Jira Query Language (JQL).
+Project key is ${JIRA_PROJECT_KEY}. Return ONLY the JQL string, nothing else.
+
+JQL Tips:
+- Use sprint in openSprints() for current/active sprint issues
+- Use sprint in closedSprints() for past sprint issues  
+- Status values use spaces not hyphens: "To Do", "In Progress", "Done"
+- For priority use: Highest, High, Medium, Low, Lowest
+- Use ORDER BY updated DESC for recent items
+- Use assignee = currentUser() for user's own issues
+- For workload queries, group by assignee
+- For recently completed: status = Done AND updated >= -7d`
         },
         { role: 'user', content: question }
       ]
@@ -565,10 +587,11 @@ app.post('/action', requireAuth, async (req, res) => {
             
 Examples of correct responses:
 {"action": "create", "summary": "Implement payment integration", "description":"full details", "priority":"High", "assignee":"arnav"}
-{"action": "update_status", "issueKey": "SHIP-123", "status": "In Progress"}
-{"action": "assign", "issueKey": "SHIP-123", "assignee": "arnav"}
+{"action": "update_status", "issueKey": "${JIRA_PROJECT_KEY}-123", "status": "In Progress"}
+{"action": "assign", "issueKey": "${JIRA_PROJECT_KEY}-123", "assignee": "arnav"}
+{"action": "generate_report", "sprint": "active"}
 {"action": "assign_by_summary", "summary": "Fix final report", "assignee": "arnav"}
-{"action": "delete", "issueKey": "SHIP-123"}
+{"action": "delete", "issueKey": "${JIRA_PROJECT_KEY}-123"}
 
 Rules:
 - Respond with ONLY the JSON object
@@ -576,6 +599,7 @@ Rules:
 - action field is REQUIRED
 - summary is REQUIRED for create actions
 - description, priority, assignee are OPTIONAL for create actions
+- sprint is REQUIRED for generate_report action (use "active" for current sprint)
 - issueKey and status are REQUIRED for update_status
 - If issue key is clear (e.g., "SHIP-123"), use "assign" with issueKey
 - If issue key is unclear (e.g., "Fix final report"), use "assign_by_summary" with the issue summary and assignee
@@ -621,18 +645,60 @@ Project key is ${JIRA_PROJECT_KEY}.`
     console.log('[ACTION NORMALIZED]', action);
 
     switch (action) {
+      case 'generate_report': {
+        let sprintObj;
+        if (!actionData.sprint || actionData.sprint.toLowerCase() === 'active') {
+          sprintObj = await jiraHelpers.getActiveSprint();
+        } else {
+          sprintObj = await jiraHelpers.getSprintByNameOrId(actionData.sprint);
+        }
+
+        // Fallback: if no sprint found, report on all project issues
+        const reportSprint = sprintObj ? sprintObj.name : '__all__';
+
+        result = {
+          action: 'generate_report',
+          message: sprintObj
+            ? `Sprint report for "${sprintObj.name}" is ready to be downloaded.`
+            : `No active sprint found. The report will cover all project issues instead.`,
+          sprintId: sprintObj ? sprintObj.id : null,
+          sprintName: reportSprint
+        };
+        break;
+      }
+
       case 'create': {
         if (!actionData.summary) {
           throw new Error('summary is required for create action');
         }
-        result = await jiraHelpers.createIssueWithFields({
+        const createdIssue = await jiraHelpers.createIssueWithFields({
           summary: actionData.summary,
           description: actionData.description,
           priority: actionData.priority,
           assignee: actionData.assignee,
           issueType: actionData.issueType || 'Task'
         });
-        result = { message: `Created issue ${result.key}`, issueKey: result.key };
+
+        const activeSprint = await jiraHelpers.getActiveSprint();
+        const sessionId = req.user.username + '-' + Date.now();
+
+        sessionStore.set(sessionId, {
+          issueKey: createdIssue.key,
+          summary: actionData.summary,
+          timestamp: Date.now()
+        });
+
+        result = { 
+          message: `Created issue ${createdIssue.key}`, 
+          issueKey: createdIssue.key,
+          sessionId,
+          activeSprint: activeSprint ? { id: activeSprint.id, name: activeSprint.name } : null,
+          questionResolution: {
+            type: 'follow-up',
+            question: `Do you want to add issue ${createdIssue.key} to a sprint or leave it in the backlog?`,
+            options: ['sprint', 'backlog']
+          }
+        };
         break;
       }
 

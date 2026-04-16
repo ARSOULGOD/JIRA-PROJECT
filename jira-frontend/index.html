@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -534,11 +534,45 @@
     // ACTION/QUERY DETECTION
     // ──────────────────────────────────────────────────────────────
     function isActionRequest(question) {
-      const actionKeywords = /\b(create|update|assign|delete|change|modify|set|mark|close|transition|move)\b/i;
+      const actionKeywords = /\b(create|update|assign|delete|change|modify|set|mark|close|transition|move|generate|download|report)\b/i;
       return actionKeywords.test(question);
     }
 
     function createActionResultCard(result) {
+      if (result.action === 'generate_report') {
+        return `
+          <div class="glass p-6 border border-purple-500/30 bg-purple-500/5">
+            <div class="flex items-center gap-3 mb-3">
+              <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <h3 class="text-lg font-semibold text-purple-300">Report Ready</h3>
+            </div>
+            <p class="text-slate-300 mb-4">${result.message}</p>
+            <button onclick="downloadSprintReport('${result.sprintName}')" class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-medium transition capitalize border border-purple-500/30">
+              Download PDF
+            </button>
+          </div>
+        `;
+      }
+      
+      if (result.questionResolution) {
+        return `
+          <div class="glass p-6 border border-blue-500/30 bg-blue-500/5">
+            <div class="flex items-center gap-3 mb-3">
+              <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <h3 class="text-lg font-semibold text-blue-300">Action Follow-up Required</h3>
+            </div>
+            <p class="text-slate-300 mb-4">${result.message}. ${result.questionResolution.question}</p>
+            <div class="flex gap-3">
+              ${result.questionResolution.options.map(opt => `
+                <button onclick="handleFollowUp('${result.sessionId}', '${opt}')" class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition capitalize border border-blue-500/30">
+                  ${opt}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
       return `
         <div class="glass p-6 border border-green-500/30 bg-green-500/5">
           <div class="flex items-center gap-3 mb-3">
@@ -548,6 +582,80 @@
           <p class="text-slate-300">${result.message}</p>
         </div>
       `;
+    }
+
+    async function downloadSprintReport(sprintName) {
+      try {
+        showToast('Generating PDF report...', 'info');
+        const response = await fetch(`${API_BASE}/report?sprint=${encodeURIComponent(sprintName)}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to generate report');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sprint-report-${sprintName.replace(/\\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        showToast('Report downloaded successfully!', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleFollowUp(sessionId, responseOpt) {
+      const resultsContainer = document.getElementById('resultsContainer');
+      const loadingSkeleton = document.getElementById('loadingSkeleton');
+
+      // Swap out the current container for loading
+      resultsContainer.innerHTML = '';
+      loadingSkeleton.classList.remove('hidden');
+
+      try {
+        const response = await fetch(`${API_BASE}/follow-up`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ sessionId, response: responseOpt })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Follow-up failed');
+        }
+
+        const data = await response.json();
+        
+        resultsContainer.innerHTML = `
+          <div class="glass p-6 border border-green-500/30 bg-green-500/5">
+            <div class="flex items-center gap-3 mb-3">
+              <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <h3 class="text-lg font-semibold text-green-300">Issue Updated</h3>
+            </div>
+            <p class="text-slate-300">${data.message}</p>
+          </div>
+        `;
+        showToast(data.message, 'success');
+
+      } catch (err) {
+        showToast(err.message, 'error');
+        resultsContainer.innerHTML = `
+          <div class="glass p-6 border border-red-500/30 bg-red-500/5">
+            <p class="text-red-400 text-sm">${err.message}</p>
+          </div>
+        `;
+      } finally {
+        loadingSkeleton.classList.add('hidden');
+      }
     }
 
     // ──────────────────────────────────────────────────────────────
