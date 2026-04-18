@@ -666,7 +666,9 @@ Project key is ${JIRA_PROJECT_KEY}.`
           action: 'generate_report',
           message: sprintObj
             ? `Sprint report for "${sprintObj.name}" is ready to be downloaded.`
-            : `No active sprint found. The report will cover all project issues instead.`,
+            : (!actionData.sprint || actionData.sprint.toLowerCase() === 'active' 
+                ? `No active sprint found. The report will cover all project issues instead.`
+                : `Sprint "${actionData.sprint}" not found. The report will cover all project issues instead.`),
           sprintId: sprintObj ? sprintObj.id : null,
           sprintName: reportSprint
         };

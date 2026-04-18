@@ -87,9 +87,16 @@ async function getSprintByNameOrId(sprintIdentifier) {
     const sprintRes = await jiraAxios.get(`/rest/agile/1.0/board/${board.id}/sprint?maxResults=50`);
     const sprints = sprintRes.data.values || [];
     
+    // Ensure sprintIdentifier is a string for string operations
+    const searchStr = String(sprintIdentifier).toLowerCase();
+    
     let sprint = sprints.find(s => s.id === parseInt(sprintIdentifier));
     if (!sprint) {
-      sprint = sprints.find(s => s.name.toLowerCase() === sprintIdentifier.toLowerCase());
+      sprint = sprints.find(s => s.name.toLowerCase() === searchStr);
+    }
+    if (!sprint) {
+      // Fallback: check if the sprint name contains the given identifier (e.g., "sprint 2" matches "Project Sprint 2")
+      sprint = sprints.find(s => s.name.toLowerCase().includes(searchStr));
     }
     return sprint || null;
   } catch (err) {
