@@ -590,6 +590,7 @@ app.post('/action', requireAuth, async (req, res) => {
             
 Examples of correct responses:
 {"action": "create", "summary": "Implement payment integration", "description":"full details", "priority":"High", "assignee":"arnav"}
+{"action": "create_sprint", "name": "Sprint 2", "goal": "Complete auth module"}
 {"action": "update_status", "issueKey": "${JIRA_PROJECT_KEY}-123", "status": "In Progress"}
 {"action": "assign", "issueKey": "${JIRA_PROJECT_KEY}-123", "assignee": "arnav"}
 {"action": "generate_report", "sprint": "active"}
@@ -600,11 +601,13 @@ Rules:
 - Respond with ONLY the JSON object
 - No markdown, no backticks, no text before or after
 - action field is REQUIRED
-- summary is REQUIRED for create actions
+- For ANY request about generating/downloading PDF, reports, sprint summary, or team workload report => use "generate_report"
+- summary is REQUIRED for create actions (creating issues)
 - description, priority, assignee are OPTIONAL for create actions
-- sprint is REQUIRED for generate_report action (use "active" for current sprint)
+- sprint is REQUIRED for generate_report action (use "active" for current sprint, or a sprint name/number)
+- For create_sprint: name is REQUIRED, goal is OPTIONAL
 - issueKey and status are REQUIRED for update_status
-- If issue key is clear (e.g., "SHIP-123"), use "assign" with issueKey
+- If issue key is clear (e.g., "${JIRA_PROJECT_KEY}-123"), use "assign" with issueKey
 - If issue key is unclear (e.g., "Fix final report"), use "assign_by_summary" with the issue summary and assignee
 - issueKey and assignee are REQUIRED for assign action
 - summary and assignee are REQUIRED for assign_by_summary action
@@ -666,6 +669,24 @@ Project key is ${JIRA_PROJECT_KEY}.`
             : `No active sprint found. The report will cover all project issues instead.`,
           sprintId: sprintObj ? sprintObj.id : null,
           sprintName: reportSprint
+        };
+        break;
+      }
+
+      case 'create_sprint': {
+        if (!actionData.name) {
+          throw new Error('Sprint name is required for create_sprint action');
+        }
+        const newSprint = await jiraHelpers.createSprint(
+          actionData.name,
+          actionData.startDate || null,
+          actionData.endDate || null,
+          actionData.goal || null
+        );
+        result = {
+          message: `Created sprint "${newSprint.name}" (ID: ${newSprint.id}). You can start it from your Jira board.`,
+          sprintId: newSprint.id,
+          sprintName: newSprint.name
         };
         break;
       }

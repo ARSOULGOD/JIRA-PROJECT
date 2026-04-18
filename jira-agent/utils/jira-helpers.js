@@ -246,13 +246,42 @@ async function searchIssues(jql, maxResults = 50) {
   }
 }
 
+/**
+ * Create a new sprint for the project's board
+ */
+async function createSprint(name, startDate, endDate, goal) {
+  try {
+    const board = await getBoardForProject();
+    if (!board) {
+      throw new Error('No board found for this project.');
+    }
+
+    const payload = {
+      name,
+      originBoardId: board.id
+    };
+    if (startDate) payload.startDate = startDate;
+    if (endDate) payload.endDate = endDate;
+    if (goal) payload.goal = goal;
+
+    console.log('[JIRA] Creating sprint:', JSON.stringify(payload, null, 2));
+    const res = await jiraAxios.post('/rest/agile/1.0/sprint', payload);
+    return res.data;
+  } catch (err) {
+    console.error('[JIRA] Error creating sprint:', err.response?.data || err.message);
+    throw new Error(`Failed to create sprint: ${err.response?.data?.errorMessages?.[0] || err.message}`);
+  }
+}
+
 module.exports = {
   jiraAxios,
+  getBoardForProject,
   getActiveSprint,
   getSprintByNameOrId,
   getSprintIssues,
   getAllSprints,
   createIssueWithFields,
   addIssueToSprint,
-  searchIssues
+  searchIssues,
+  createSprint
 };
